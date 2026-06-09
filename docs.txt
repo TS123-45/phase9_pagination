@@ -1,49 +1,188 @@
-How It Works
+Backend (api.js)
+
+Step 1: Read page number
+
+const page = parseInt(req.query.page) || 1;
+
+If the URL is:  /api/users?page=3
+
+Then:
+
+page = 3;
+
+If no page is provided:  /api/users
+
+Then:  page = 1;
+
+because of:    || 1
+
+Step 2: Read limit
+
+const limit = parseInt(req.query.limit) || 5;
+
+Suppose:  /api/users?page=2&limit=5
+
+Then:   limit = 5;
+
+Meaning:   Show 5 users per page
+
+Step 3: Calculate offset
+
+const offset = (page - 1) * limit;
+
 Page 1
 
-Frontend requests:
+offset = (1 - 1) * 5
+       = 0
 
-GET /api/users?page=1
-
-Backend calculates:
-
-offset = (1 - 1) * 5;
-offset = 0;
-
-SQL:
-
-SELECT *
-FROM users
-LIMIT 5 OFFSET 0;
-
-Returns:
-
-Tony
-John
-David
-Sam
-Alex
 Page 2
 
-Frontend requests:
+offset = (2 - 1) * 5
+       = 5
 
+Page 3
+
+offset = (3 - 1) * 5
+       = 10
+
+Page 4
+
+offset = (4 - 1) * 5
+       = 15
+
+Step 4: Fetch users
+
+SELECT * FROM users LIMIT ? OFFSET ?
+
+Suppose: LIMIT 5 OFFSET 0
+
+SQL returns:
+User 1
+User 2
+User 3
+User 4
+User 5
+
+Suppose:  LIMIT 5 OFFSET 5
+
+SQL returns:
+User 6
+User 7
+User 8
+User 9
+User 10
+
+Suppose:  LIMIT 5 OFFSET 10
+
+SQL returns:
+User 11
+User 12
+User 13
+User 14
+User 15
+
+To provide additional information to front end following steps are required.
+
+Step 5: Count total records
+
+const totalRecords =
+await queryDatabase(
+  "SELECT COUNT(*) AS total FROM users"
+);
+
+Suppose table contains:
+
+25 users
+
+Result:
+
+[
+  {
+    total: 25
+  }
+]
+
+Step 6: Extract total
+
+const total = totalRecords[0].total;
+
+Now: total = 25;
+
+Step 7: Calculate total pages
+
+const totalPages = Math.ceil(total / limit);
+
+Suppose:
+
+total = 25;
+limit = 5;
+
+Then:
+
+25 / 5 = 5
+
+Result:
+
+totalPages = 5;
+
+Another example:
+
+total = 23;
+limit = 5;
+
+23 / 5 = 4.6
+
+Math.ceil(4.6)
+
+Rounds up:
+
+5
+
+Because page 5 contains:
+
+User 21
+User 22
+User 23
+
+Step 8: Send response
+
+res.status(200).json({
+  currentPage: page,
+  totalPages,
+  totalRecords: total,
+  data: users,
+});
+
+Example response:
+
+{
+  "currentPage": 2,
+  "totalPages": 5,
+  "totalRecords": 25,
+  "data": [
+    {
+      "id": 6,
+      "name": "Tony"
+    },
+    {
+      "id": 7,
+      "name": "John"
+    }
+  ]
+}
+
+Your pagination system is doing this:
+
+User clicks Next
+        ↓
+Frontend increases page number
+        ↓
 GET /api/users?page=2
-
-Backend calculates:
-
-offset = (2 - 1) * 5;
-offset = 5;
-
-SQL:
-
-SELECT *
-FROM users
-LIMIT 5 OFFSET 5;
-
-Returns:
-
-Mike
-Peter
-Chris
-Robert
-James
+        ↓
+Backend calculates offset
+        ↓
+SELECT * FROM users LIMIT 5 OFFSET 5
+        ↓
+Returns Users 6-10
+        ↓
+Frontend displays them
